@@ -100,17 +100,21 @@ en `src/lib/state/useAssumptionsStore.ts`. La serialización a JSON codifica
 
 Tu trabajo:
 
-1. Los 8 presets de estrés en `src/lib/assumptions/presets/stress.ts` y la pantalla
-   `src/app/estres/page.tsx`. Aplican overrides y navegan al simulador con `?preset=sequia-severa`.
+1. Los 8 presets de estrés en `src/lib/assumptions/presets/stress.ts` (ese directorio todavía no
+   existe) y la pantalla `src/app/proyecto/[id]/estres/page.tsx`. Aplican overrides y navegan al
+   simulador de la finca activa con `/proyecto/${id}?preset=sequia-severa`.
 2. `src/components/events/TimelineEditor.tsx` y `EventCard.tsx`, montados en el panel de supuestos
    bajo «Eventos temporales».
-3. `src/app/preguntas/page.tsx`: las 15 preguntas del documento resueltas por bisección sobre
+3. `src/app/proyecto/[id]/preguntas/page.tsx`: las 15 preguntas del documento resueltas por bisección sobre
    `runScenario(scenario, base)` de `src/lib/sim/useSimulation.ts` (ojo: el segundo argumento es la
    configuración de la finca activa, que sacas de `useAssumptionsStore.getState().base`).
 4. El route handler `src/app/api/explicar/route.ts` ya está escrito y con streaming; falta comprobar
    que funciona con `ANTHROPIC_API_KEY` en `.env.local` y que el fallback 501 se ve bien en
    `src/components/explain/AiExplainButton.tsx`.
-5. Deploy en Vercel. Pregunta antes de desplegar.
+5. Repón los enlaces en el `NAV` de `src/components/Topbar.tsx`: `{ segment: '/estres', label:
+   'Estrés' }` y `{ segment: '/preguntas', label: 'Preguntas' }`. El `NAV` guarda segmentos
+   relativos que `NavLinks` cuelga de `/proyecto/${projectId}`.
+6. Deploy en Vercel. Pregunta antes de desplegar.
 
 Verifica en el navegador con Playwright (instalación global en
 `/Users/simeonaldana/.npm-global/lib/node_modules/playwright/index.mjs`, dev server en
