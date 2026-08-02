@@ -4,7 +4,7 @@ Estado del proyecto y los dos encargos que quedan, listos para pasarle a un agen
 
 ## Estado actual
 
-Fases 1 a 4 del plan (`~/.claude/plans/purring-crunching-rabbit.md`) están completas, más la capa
+Fases 1 a 4 del plan (`PLAN.md`, en la raíz del repo) están completas, más la capa
 de **proyectos (fincas)** que no estaba en el plan original:
 
 - **Fase 1 — Motor.** `src/engine/`, TypeScript puro y determinista. `simulate(assumptions, overrides)`
@@ -14,7 +14,9 @@ de **proyectos (fincas)** que no estaba en el plan original:
 - **Fase 4 — Narrativa determinista.** `src/lib/explain/` (findings → ledger → rules → narrative →
   remedies) y el botón «Explicar con IA» contra `src/app/api/explicar/route.ts`.
 - **Proyectos.** Dos niveles: cada proyecto es una finca con su configuración base y, dentro, sus
-  escenarios. Pantalla `/proyectos`, switcher en el topbar, borrador de trabajo por finca.
+  escenarios. La lista de fincas es la raíz `/` (`src/app/page.tsx`), switcher en el topbar,
+  borrador de trabajo por finca. Cada finca vive en `/proyecto/[id]` (simulador) y
+  `/proyecto/[id]/comparar`.
 - **Adquisición.** Bloque `acquisition` en `Assumptions` (`isPurchase`, `landCost`, `herdCost`,
   `infrastructureCost`, `closingCost`). En modo compra `equityFlows[0]` es el desembolso propio
   (pagado + caja − deuda) en vez del valor de liquidación implícito, así que la TIR responde «¿me
@@ -25,10 +27,13 @@ Verificación al cerrar: `npx tsc --noEmit` limpio, `npx eslint src scripts` lim
 en verde, y los flujos de proyectos comprobados en Chromium (crear finca, cambiar de finca, KPIs por
 tarjeta, persistencia tras recargar, borrado con confirmación).
 
-**Lo que falta:** `/estres`, `/riesgo` y `/preguntas` no existen todavía. Sus enlaces se quitaron
-del `NAV` de `src/components/Topbar.tsx` para no dejar 404 a la vista; hay que reponerlos al
-construir cada pantalla. Son justamente las dos fases de abajo. Las rutas viven ahora bajo
-`/proyecto/[id]/…`, no en la raíz.
+**Lo que falta:** las pantallas de riesgo, estrés y preguntas no existen todavía. Van bajo
+`/proyecto/[id]/…`, no en la raíz: `src/app/proyecto/[id]/riesgo/page.tsx`,
+`.../estres/page.tsx`, `.../preguntas/page.tsx`. Sus enlaces se quitaron del `NAV` de
+`src/components/Topbar.tsx` para no dejar 404 a la vista; hay que reponerlos al construir cada
+pantalla añadiendo `{ segment: '/riesgo', label: 'Riesgo' }` y equivalentes — el `NAV` guarda
+segmentos relativos y `NavLinks` los cuelga de `/proyecto/${projectId}`. Son justamente las dos
+fases de abajo.
 
 ## Notas para quien siga
 
@@ -47,9 +52,8 @@ construir cada pantalla. Son justamente las dos fases de abajo. Las rutas viven 
 ## Agente A — Fase 5: worker, Monte Carlo y sensibilidad
 
 El repo es `/Users/simeonaldana/Documents/venek-vaka`. Es un simulador de escenarios para fincas
-ganaderas de doble propósito; el plan completo está en
-`/Users/simeonaldana/.claude/plans/purring-crunching-rabbit.md` (lee la Fase 5 y la sección
-«Verificación»). Lee `AGENTS.md`: esta versión de Next.js tiene breaking changes, consulta
+ganaderas de doble propósito; el plan completo está en `PLAN.md`, en la raíz del repo (lee la
+Fase 5 y la sección «Verificación»). Lee `AGENTS.md`: esta versión de Next.js tiene breaking changes, consulta
 `node_modules/next/dist/docs/` antes de escribir código.
 
 El motor (`src/engine/`) es TypeScript puro y determinista: `simulate(assumptions, overrides)` corre
@@ -61,15 +65,16 @@ Tu trabajo:
 
 1. `src/lib/workers/simulation.worker.ts` con el protocolo
    `{type:'RUN'|'MONTECARLO'|'TORNADO'|'CANCEL', runId}`. Los resultados stale se descartan por `runId`.
-2. Monte Carlo en chunks de 200 iteraciones, con progreso y cancelación entre chunks. Usa
+2. Monte Carlo en chunks de 200 iteraciones, con progreso y cancelación entre chunks. Crea
    `src/engine/analysis/` (`montecarlo.ts`, `rng.ts` con mulberry32 sembrado, `sensitivity.ts`,
-   `breakpoint.ts`) — revisa qué hay escrito ahí antes de duplicar. Devuelve percentiles y bins ya
-   reducidos como `Float64Array` transferible, nunca 5.000 outputs.
+   `breakpoint.ts`); hoy ese directorio no existe. Devuelve percentiles y bins ya reducidos como
+   `Float64Array` transferible, nunca 5.000 outputs.
 3. Los rangos de cada variable salen de `mc: {dist, min, mode, max}` en
-   `src/lib/assumptions/schema.ts` (`MC_VARIABLES`).
-4. Pantalla `src/app/riesgo/page.tsx` con histograma, fan chart, tabla de percentiles y tornado con
-   puntos de quiebre. Componentes en `src/components/risk/`. **Obligatorio**: todas las series de
-   Recharts llevan `isAnimationActive={false}`.
+   `src/lib/assumptions/schema.ts` (`MC_VARIABLES`, ya exportado).
+4. Pantalla `src/app/proyecto/[id]/riesgo/page.tsx` con histograma, fan chart, tabla de percentiles
+   y tornado con puntos de quiebre. Componentes en `src/components/risk/`. Repón el enlace en el
+   `NAV` de `src/components/Topbar.tsx` con `{ segment: '/riesgo', label: 'Riesgo' }`.
+   **Obligatorio**: todas las series de Recharts llevan `isAnimationActive={false}`.
 
 Verifica en el navegador con Playwright (instalación global en
 `/Users/simeonaldana/.npm-global/lib/node_modules/playwright/index.mjs`, dev server en
@@ -81,8 +86,8 @@ Deja `npx tsc --noEmit`, `npx eslint src scripts` y `npx vitest run` en verde.
 ## Agente B — Fase 6: estrés, eventos temporales y preguntas
 
 El repo es `/Users/simeonaldana/Documents/venek-vaka`. Es un simulador de escenarios para fincas
-ganaderas de doble propósito; el plan completo está en
-`/Users/simeonaldana/.claude/plans/purring-crunching-rabbit.md` (lee la Fase 6) y la especificación
+ganaderas de doble propósito; el plan completo está en `PLAN.md`, en la raíz del repo (lee la
+Fase 6), y la especificación
 original en `intruction.md` (las 15 preguntas están al final; la línea 212 explica la
 superaditividad). Lee `AGENTS.md`: esta versión de Next.js tiene breaking changes, consulta
 `node_modules/next/dist/docs/` antes de escribir código.
