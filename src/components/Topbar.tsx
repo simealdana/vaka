@@ -11,6 +11,9 @@ import { useWorkingState } from '@/lib/storage/useWorkingState';
 const NAV = [
   { segment: '', label: 'Simulador' },
   { segment: '/comparar', label: 'Comparar' },
+  { segment: '/riesgo', label: 'Riesgo' },
+  { segment: '/estres', label: 'Estrés' },
+  { segment: '/preguntas', label: 'Preguntas' },
 ];
 
 function NavLinks({ projectId, pathname }: { projectId: string; pathname: string }) {

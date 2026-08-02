@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { TimelineEditor } from '@/components/events/TimelineEditor';
 import { GROUPS, type GroupId, VARIABLES, type VariableSpec, searchVariables } from '@/lib/assumptions/schema';
 import { useAssumptionsStore } from '@/lib/state/useAssumptionsStore';
 import { useProjectsStore } from '@/lib/state/useProjectsStore';
@@ -127,6 +128,7 @@ export function AssumptionsPanel() {
             </section>
           );
         })}
+        {searching ? null : <TimelineEditor />}
       </div>
     </div>
   );

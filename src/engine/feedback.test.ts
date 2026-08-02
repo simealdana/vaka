@@ -90,6 +90,27 @@ describe('superaditividad', () => {
     const interaction = impact([sequia, concentrado]) - impact([sequia]) - impact([concentrado]);
     expect(interaction).toBeGreaterThanOrEqual(0);
   });
+
+  // La crisis compuesta del documento (líneas 205-211): leche −20%, alimento +30%,
+  // mortalidad de becerros al 12% y siete meses de sequía. Es el caso que justifica que el
+  // simulador exista: cuatro golpes moderados que juntos hacen más daño que sumados.
+  it('la crisis compuesta del documento es estrictamente peor que la suma de sus cuatro golpes', () => {
+    const window = { startMonth: 12, durationMonths: 12 };
+    const leche = shock({ ...window, id: 'leche', target: 'milk.priceIndex', op: 'pctDelta', value: -0.2 });
+    const concentrado = shock({ ...window, id: 'conc', target: 'feed.concentrateCostPerKg', op: 'pctDelta', value: 0.3 });
+    const forraje = shock({ ...window, id: 'forr', target: 'feed.purchasedForageCostPerKgDm', op: 'pctDelta', value: 0.3 });
+    const mortalidad = shock({ ...window, id: 'mort', target: 'health.calfMortalityToWeaning', op: 'set', value: 0.12 });
+    const sequia7 = shock({ id: 'seq7', target: 'feed.dmPerHaMonth', op: 'multiply', value: 0.5, startMonth: 12, durationMonths: 7 });
+
+    const parts = [leche, [concentrado, forraje], mortalidad, sequia7];
+    const sum = parts.reduce((a, p) => a + impact(Array.isArray(p) ? p : [p]), 0);
+    const together = impact([leche, concentrado, forraje, mortalidad, sequia7]);
+
+    expect(sum).toBeLessThan(0);
+    expect(together).toBeLessThan(sum);
+    // Y no por decimales: la interacción vale miles de dólares.
+    expect(together - sum).toBeLessThan(-1000);
+  });
 });
 
 describe('cadena nutrición → condición corporal → fertilidad', () => {

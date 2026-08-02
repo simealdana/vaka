@@ -12,6 +12,7 @@ import {
   HerdChart,
   MilkChart,
 } from '@/components/results/ResultCharts';
+import { PresetLoader } from '@/components/stress/PresetLoader';
 import { useSimulation } from '@/lib/sim/useSimulation';
 import { useAssumptionsStore } from '@/lib/state/useAssumptionsStore';
 
@@ -62,6 +63,7 @@ export default function SimuladorPage() {
       ) : null}
 
       <main className="min-w-0 flex-1 overflow-y-auto overscroll-contain bg-zinc-50">
+        <PresetLoader />
         <KpiStrip summary={output.summary} base={base.summary} />
 
         {output.warnings.length > 0 ? (

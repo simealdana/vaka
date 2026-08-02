@@ -27,13 +27,32 @@ Verificación al cerrar: `npx tsc --noEmit` limpio, `npx eslint src scripts` lim
 en verde, y los flujos de proyectos comprobados en Chromium (crear finca, cambiar de finca, KPIs por
 tarjeta, persistencia tras recargar, borrado con confirmación).
 
-**Lo que falta:** las pantallas de riesgo, estrés y preguntas no existen todavía. Van bajo
-`/proyecto/[id]/…`, no en la raíz: `src/app/proyecto/[id]/riesgo/page.tsx`,
-`.../estres/page.tsx`, `.../preguntas/page.tsx`. Sus enlaces se quitaron del `NAV` de
-`src/components/Topbar.tsx` para no dejar 404 a la vista; hay que reponerlos al construir cada
-pantalla añadiendo `{ segment: '/riesgo', label: 'Riesgo' }` y equivalentes — el `NAV` guarda
-segmentos relativos y `NavLinks` los cuelga de `/proyecto/${projectId}`. Son justamente las dos
-fases de abajo.
+- **Fase 5 — Riesgo.** `src/engine/analysis/` (`rng.ts` mulberry32 sembrado, `montecarlo.ts`,
+  `sensitivity.ts`, `breakpoint.ts`), pool de workers en `src/lib/workers/`, `src/lib/sim/mcInputs.ts`
+  (recentra los rangos `MC_VARIABLES` sobre la finca activa) y `/proyecto/[id]/riesgo` con
+  histograma, fan chart, percentiles y tornado.
+- **Fase 6 — Estrés, eventos y preguntas.** 8 presets en `src/lib/assumptions/presets/stress.ts`,
+  `/proyecto/[id]/estres` (aplica overrides y vuelve al simulador), `src/components/events/`
+  montado en el panel bajo «Eventos temporales», y `/proyecto/[id]/preguntas` con las 15 preguntas
+  resueltas por bisección (`src/lib/questions/solve.ts`).
+
+Las cinco pantallas están en el `NAV` de `src/components/Topbar.tsx`, que guarda segmentos
+relativos que `NavLinks` cuelga de `/proyecto/${projectId}`.
+
+**Lo que falta / quedó dudoso:**
+
+- El Monte Carlo muestrea cada variable de forma independiente: **no hay correlación** entre ellas
+  (falta una cópula gaussiana), así que el P10 sale optimista.
+- La mediana Monte Carlo de patrimonio (~$510k) queda muy por debajo del determinista ($765k).
+  Sospecha razonable: los rangos `mc` de `src/lib/assumptions/schema.ts` están sesgados a la baja.
+  Revisar antes de presentarle los percentiles a nadie.
+- El VAN sale negativo en el 100% de las corridas con TIR mediana de 3,5%: verificar que la tasa de
+  descuento por defecto es la que se quiere.
+- `src/engine/feedback.test.ts` documenta un hallazgo contraintuitivo: sequía + concentrado caro
+  **no** es superaditivo, porque la sequía reduce la leche que consume el concentrado.
+- El route handler `src/app/api/explicar/route.ts` no se probó contra la API real con
+  `ANTHROPIC_API_KEY`.
+- Sin desplegar en Vercel.
 
 ## Notas para quien siga
 
@@ -46,82 +65,5 @@ fases de abajo.
 - Playwright está instalado globalmente en
   `/Users/simeonaldana/.npm-global/lib/node_modules/playwright/index.mjs`. En modo dev la hidratación
   tarda: espera a que el contenido exista antes de hacer click, o el handler todavía no está montado.
-
----
-
-## Agente A — Fase 5: worker, Monte Carlo y sensibilidad
-
-El repo es `/Users/simeonaldana/Documents/venek-vaka`. Es un simulador de escenarios para fincas
-ganaderas de doble propósito; el plan completo está en `PLAN.md`, en la raíz del repo (lee la
-Fase 5 y la sección «Verificación»). Lee `AGENTS.md`: esta versión de Next.js tiene breaking changes, consulta
-`node_modules/next/dist/docs/` antes de escribir código.
-
-El motor (`src/engine/`) es TypeScript puro y determinista: `simulate(assumptions, overrides)` corre
-120 meses en pocos ms. Hoy todo corre en el hilo principal desde `src/lib/sim/useSimulation.ts`, que
-ya está adaptado a los proyectos: `baselineOutput(base: EditMap)` y `runScenario(scenario, base)`
-reciben la configuración de la finca activa, que sale de `useAssumptionsStore.getState().base`.
-
-Tu trabajo:
-
-1. `src/lib/workers/simulation.worker.ts` con el protocolo
-   `{type:'RUN'|'MONTECARLO'|'TORNADO'|'CANCEL', runId}`. Los resultados stale se descartan por `runId`.
-2. Monte Carlo en chunks de 200 iteraciones, con progreso y cancelación entre chunks. Crea
-   `src/engine/analysis/` (`montecarlo.ts`, `rng.ts` con mulberry32 sembrado, `sensitivity.ts`,
-   `breakpoint.ts`); hoy ese directorio no existe. Devuelve percentiles y bins ya reducidos como
-   `Float64Array` transferible, nunca 5.000 outputs.
-3. Los rangos de cada variable salen de `mc: {dist, min, mode, max}` en
-   `src/lib/assumptions/schema.ts` (`MC_VARIABLES`, ya exportado).
-4. Pantalla `src/app/proyecto/[id]/riesgo/page.tsx` con histograma, fan chart, tabla de percentiles
-   y tornado con puntos de quiebre. Componentes en `src/components/risk/`. Repón el enlace en el
-   `NAV` de `src/components/Topbar.tsx` con `{ segment: '/riesgo', label: 'Riesgo' }`.
-   **Obligatorio**: todas las series de Recharts llevan `isAnimationActive={false}`.
-
-Verifica en el navegador con Playwright (instalación global en
-`/Users/simeonaldana/.npm-global/lib/node_modules/playwright/index.mjs`, dev server en
-`localhost:3000`): 5.000 iteraciones con la barra de progreso avanzando y la página respondiendo.
-Deja `npx tsc --noEmit`, `npx eslint src scripts` y `npx vitest run` en verde.
-
----
-
-## Agente B — Fase 6: estrés, eventos temporales y preguntas
-
-El repo es `/Users/simeonaldana/Documents/venek-vaka`. Es un simulador de escenarios para fincas
-ganaderas de doble propósito; el plan completo está en `PLAN.md`, en la raíz del repo (lee la
-Fase 6), y la especificación
-original en `intruction.md` (las 15 preguntas están al final; la línea 212 explica la
-superaditividad). Lee `AGENTS.md`: esta versión de Next.js tiene breaking changes, consulta
-`node_modules/next/dist/docs/` antes de escribir código.
-
-Ya existen: el tipo `ScenarioOverride` en `src/engine/types.ts` (con `startMonth`, `durationMonths`,
-`rampInMonths`, `recovery`, `repeat`, `priority`), su resolución precompilada en
-`src/engine/scenario/resolve.ts`, y las acciones `addOverride` / `updateOverride` / `removeOverride`
-en `src/lib/state/useAssumptionsStore.ts`. La serialización a JSON codifica
-`durationMonths: Infinity` como `null` (`src/lib/storage/portable.ts`).
-
-Tu trabajo:
-
-1. Los 8 presets de estrés en `src/lib/assumptions/presets/stress.ts` (ese directorio todavía no
-   existe) y la pantalla `src/app/proyecto/[id]/estres/page.tsx`. Aplican overrides y navegan al
-   simulador de la finca activa con `/proyecto/${id}?preset=sequia-severa`.
-2. `src/components/events/TimelineEditor.tsx` y `EventCard.tsx`, montados en el panel de supuestos
-   bajo «Eventos temporales».
-3. `src/app/proyecto/[id]/preguntas/page.tsx`: las 15 preguntas del documento resueltas por bisección sobre
-   `runScenario(scenario, base)` de `src/lib/sim/useSimulation.ts` (ojo: el segundo argumento es la
-   configuración de la finca activa, que sacas de `useAssumptionsStore.getState().base`).
-4. El route handler `src/app/api/explicar/route.ts` ya está escrito y con streaming; falta comprobar
-   que funciona con `ANTHROPIC_API_KEY` en `.env.local` y que el fallback 501 se ve bien en
-   `src/components/explain/AiExplainButton.tsx`.
-5. Repón los enlaces en el `NAV` de `src/components/Topbar.tsx`: `{ segment: '/estres', label:
-   'Estrés' }` y `{ segment: '/preguntas', label: 'Preguntas' }`. El `NAV` guarda segmentos
-   relativos que `NavLinks` cuelga de `/proyecto/${projectId}`.
-6. Deploy en Vercel. Pregunta antes de desplegar.
-
-Verifica en el navegador con Playwright (instalación global en
-`/Users/simeonaldana/.npm-global/lib/node_modules/playwright/index.mjs`, dev server en
-`localhost:3000`). Deja `npx tsc --noEmit`, `npx eslint src scripts` y `npx vitest run` en verde.
-Añade un test de superaditividad en `src/engine/` si no existe: `Δ(sequía + concentrado +40%)` debe
-ser estrictamente peor que `Δ(sequía) + Δ(concentrado)`.
-
----
-
-Los dos encargos son independientes salvo por `useAssumptionsStore`, que ninguno necesita modificar.
+- El Monte Carlo corre en un pool de workers: 5.000 iteraciones tardan ~2,5 s sin bloquear el hilo
+  principal, y la cancelación entre chunks descarta resultados stale por `runId`.
